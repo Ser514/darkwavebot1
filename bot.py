@@ -1,4 +1,3 @@
-# coding=utf-8
 import os
 import logging
 from aiogram import Bot, Dispatcher, F, types
@@ -8,7 +7,6 @@ from aiogram.types import (
     InputMediaPhoto, InputMediaVideo
 )
 from aiogram.enums import ParseMode
-from aiogram.client.session.bot import DefaultBotProperties
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage
@@ -24,10 +22,11 @@ PORT = int(os.getenv("PORT", 10000))
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-bot = Bot(
-    token=BOT_TOKEN,
-    default=DefaultBotProperties(parse_mode=ParseMode.HTML)
-)
+# Ініціалізація бота без parse_mode у конструкторі
+bot = Bot(token=BOT_TOKEN)
+# Встановлюємо parse_mode через властивість (після створення)
+bot.parse_mode = ParseMode.HTML
+
 storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
 
@@ -184,7 +183,6 @@ def profile_interaction_keyboard(user_id: int) -> InlineKeyboardMarkup:
     ])
 
 async def show_profiles(message: Message):
-    # Тимчасові фейкові анкети — заміни на справжні із бази!
     fake_profiles = [
         {"id": 1001, "name": "Аліса", "age": 23, "city": "Київ", "photo": "AgACAgQAAxkBA..."},
         {"id": 1002, "name": "Макс", "age": 26, "city": "Львів", "photo": "AgACAgQAAxkBA..."}
