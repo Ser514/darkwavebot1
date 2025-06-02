@@ -1,22 +1,29 @@
 import os
 import asyncio
-from aiogram import Bot, Dispatcher, F
-from aiogram.types import Message, ContentType
+from aiogram import Bot, Dispatcher, F, Router
+from aiogram.types import Message
+from aiogram.enums import ParseMode
+from aiogram.client.default import DefaultBotProperties
 from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.fsm.state import StatesGroup, State
-from aiogram.types import FSInputFile
-from aiogram.enums.parse_mode import ParseMode
-from aiogram import Router
 
+# Ініціалізація бота
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHANNEL_ID = os.getenv("CHANNEL_ID")  # приклад: '@darkwave_channel'
 
-bot = Bot(token=BOT_TOKEN, parse_mode=ParseMode.HTML)
-dp = Dispatcher(storage=MemoryStorage())
+bot = Bot(
+    token=BOT_TOKEN,
+    default=DefaultBotProperties(parse_mode=ParseMode.HTML)
+)
+
+# Налаштування диспетчера та FSM
+storage = MemoryStorage()
+dp = Dispatcher(storage=storage)
 router = Router()
 dp.include_router(router)
 
+# Стани анкети
 class Form(StatesGroup):
     name = State()
     age = State()
@@ -28,6 +35,7 @@ class Form(StatesGroup):
     contact = State()
     photo = State()
 
+# Команда /start
 @router.message(F.text == "/start")
 async def start_handler(message: Message, state: FSMContext):
     await message.answer("🌑 Привіт у Darkwave.\nГотовий заповнити анкету? Відповідай на запитання.")
@@ -96,9 +104,9 @@ async def get_photo(message: Message, state: FSMContext):
     await message.answer("✅ Твою анкету надіслано до каналу. Дякуємо!")
     await state.clear()
 
+# Запуск бота
 async def main():
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
     asyncio.run(main())
-
