@@ -25,8 +25,7 @@ class Form(StatesGroup):
 
 @dp.message_handler(commands='start')
 async def start_handler(message: types.Message):
-    await message.answer("🌑 Привіт у Darkwave.")
-("Готовий заповнити анкету? Відповідай на запитання.")
+    await message.answer("🌑 Привіт у Darkwave.\nГотовий заповнити анкету? Відповідай на запитання.")
     await Form.name.set()
 
 @dp.message_handler(state=Form.name)
