@@ -11,7 +11,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 
 # 🔧 Конфіг
-BOT_TOKEN = "7735699455:AAHG1QV9B-h6IwCCvHYmw0nlqUy0PcwBZSw"
+BOT_TOKEN = "7735699455:AAGJesHAXrWqsoadTqVTr6x9JtkkoGS9n0M"
 CHANNEL_ID = "@darkwave_love"
 
 # ✅ Валідація
