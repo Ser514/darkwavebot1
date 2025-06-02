@@ -1,32 +1,32 @@
 import os
-import asyncio
 import logging
-from aiogram import Bot, Dispatcher, F, Router
+from aiohttp import web
+from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
-from aiogram.exceptions import TelegramConflictError
-from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
+from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage
-import sys
 
-# Ініціалізація логів
+# 🔐 ENV-змінні
+BOT_TOKEN = os.getenv("7735699455:AAGJesHAXrWqsoadTqVTr6x9JtkkoGS9n0M")
+CHANNEL_ID = os.getenv("@darkwave_love")  # Наприклад: @darkwave_love
+WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "supersecret")
+BASE_WEBHOOK_URL = os.getenv("BASE_WEBHOOK_URL")  # https://your-app.onrender.com
+WEBHOOK_PATH = "/webhook"
+PORT = int(os.getenv("PORT", 10000))
+
+# ⚙️ Логування
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# .env змінні
-BOT_TOKEN = os.getenv("BOT_TOKEN") or "7735699455:AAGJesHAXrWqsoadTqVTr6x9JtkkoGS9n0M"
-CHANNEL_ID = os.getenv("CHANNEL_ID") or "@darkwave_love"
-
-# Ініціалізація бота
+# 🤖 Ініціалізація бота
 bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
-router = Router()
-dp.include_router(router)
 
-# Стани анкети
+# 📋 Стан машини
 class Form(StatesGroup):
     name = State()
     age = State()
@@ -38,68 +38,70 @@ class Form(StatesGroup):
     contact = State()
     photo = State()
 
-# /start
-@router.message(F.text == "/start")
+# 🚀 /start
+@dp.message(F.text == "/start")
 async def start_handler(message: Message, state: FSMContext):
     await message.answer("🌑 Привіт у Darkwave.\nГотовий заповнити анкету? Відповідай на запитання.")
     await state.set_state(Form.name)
 
-@router.message(Form.name)
+@dp.message(Form.name)
 async def get_name(message: Message, state: FSMContext):
     await state.update_data(name=message.text)
     await state.set_state(Form.age)
     await message.answer("Скільки тобі років?")
 
-@router.message(Form.age)
+@dp.message(Form.age)
 async def get_age(message: Message, state: FSMContext):
     await state.update_data(age=message.text)
     await state.set_state(Form.city)
     await message.answer("Звідки ти?")
 
-@router.message(Form.city)
+@dp.message(Form.city)
 async def get_city(message: Message, state: FSMContext):
     await state.update_data(city=message.text)
     await state.set_state(Form.orientation)
     await message.answer("Яка твоя орієнтація? (Гетеро / Бі / Інше)")
 
-@router.message(Form.orientation)
+@dp.message(Form.orientation)
 async def get_orientation(message: Message, state: FSMContext):
     await state.update_data(orientation=message.text)
     await state.set_state(Form.looking_for)
     await message.answer("Кого шукаєш?")
 
-@router.message(Form.looking_for)
+@dp.message(Form.looking_for)
 async def get_looking_for(message: Message, state: FSMContext):
     await state.update_data(looking_for=message.text)
     await state.set_state(Form.vibe)
     await message.answer("Опиши свій вайб, стиль або музику яку слухаєш:")
 
-@router.message(Form.vibe)
+@dp.message(Form.vibe)
 async def get_vibe(message: Message, state: FSMContext):
     await state.update_data(vibe=message.text)
     await state.set_state(Form.height)
     await message.answer("Який твій зріст?")
 
-@router.message(Form.height)
+@dp.message(Form.height)
 async def get_height(message: Message, state: FSMContext):
     await state.update_data(height=message.text)
     await state.set_state(Form.contact)
     await message.answer("Вкажи свій Telegram @нік:")
 
-@router.message(Form.contact)
+@dp.message(Form.contact)
 async def get_contact(message: Message, state: FSMContext):
     await state.update_data(contact=message.text)
     await state.set_state(Form.photo)
     await message.answer("Надішли фото (одне):")
 
-@router.message(Form.photo, F.photo)
+@dp.message(Form.photo, F.photo)
 async def get_photo(message: Message, state: FSMContext):
     data = await state.get_data()
     caption = f"""
 🖤 Ім’я: {data['name']}
+🎂 Вік: {data['age']}
 📍 Місто: {data['city']}
-🎧 Вайб: {data['vibe']}
+🏳️ Орієнтація: {data['orientation']}
 💬 Шукає: {data['looking_for']}
+🎧 Вайб: {data['vibe']}
 📏 Зріст: {data['height']}
 🔗 Telegram: {data['contact']}
 """
@@ -107,24 +109,30 @@ async def get_photo(message: Message, state: FSMContext):
     await message.answer("✅ Твою анкету надіслано до каналу. Дякуємо!")
     await state.clear()
 
-# Головна функція запуску
-async def main():
-    try:
-        logger.info("Видаляю webhook і очищую pending updates...")
-        await bot.delete_webhook(drop_pending_updates=True)
+# 🔗 Webhook старт
+async def on_startup(app):
+    webhook_url = f"{BASE_WEBHOOK_URL}{WEBHOOK_PATH}"
+    await bot.set_webhook(webhook_url, secret_token=WEBHOOK_SECRET)
+    logger.info(f"Webhook встановлено: {webhook_url}")
 
-        logger.info("Запускаю бота через polling...")
-        await dp.start_polling(bot)
+# 🧹 Webhook стоп
+async def on_shutdown(app):
+    await bot.delete_webhook()
+    logger.info("Webhook видалено")
 
-    except TelegramConflictError as e:
-        logger.error(f"❌ Конфлікт: {e}")
-        logger.error("🔴 Схоже, бот уже працює десь ще. Зупини інші процеси або перезапусти токен через BotFather.")
-        sys.exit("Вихід через TelegramConflictError")
+# 🔁 Обробка запитів Telegram
+async def handle_webhook(request):
+    if request.headers.get("X-Telegram-Bot-Api-Secret-Token") != WEBHOOK_SECRET:
+        return web.Response(status=403)
+    update = await request.json()
+    await dp.feed_raw_update(bot, update)
+    return web.Response()
 
-    except Exception as e:
-        logger.exception("❌ Неочікувана помилка під час запуску бота")
-        raise e
+# 🧩 Запуск aiohttp сервера
+app = web.Application()
+app.on_startup.append(on_startup)
+app.on_shutdown.append(on_shutdown)
+app.router.add_post(WEBHOOK_PATH, handle_webhook)
 
 if __name__ == "__main__":
-    asyncio.run(main())
-
+    web.run_app(app, port=PORT)
