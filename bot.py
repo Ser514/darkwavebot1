@@ -11,9 +11,9 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 # 🔐 ENV-змінні
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-CHANNEL_ID = os.getenv("CHANNEL_ID")  # Наприклад: @darkwave_love
+CHANNEL_ID = os.getenv("CHANNEL_ID")  # <-- Виправлено!
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "supersecret")
-BASE_WEBHOOK_URL = os.getenv("BASE_WEBHOOK_URL")  # https://your-app.onrender.com
+BASE_WEBHOOK_URL = os.getenv("BASE_WEBHOOK_URL")
 WEBHOOK_PATH = "/webhook"
 PORT = int(os.getenv("PORT", 10000))
 
@@ -38,10 +38,9 @@ class Form(StatesGroup):
     contact = State()
     photo = State()
 
-# 🚀 /start
 @dp.message(F.text == "/start")
 async def start_handler(message: Message, state: FSMContext):
-    await message.answer("🌑 Привіт у Darkwave.\nЯк до тебе звертатися?")
+    await message.answer("🌑 Привіт у Darkwave.\nГотовий заповнити анкету? Відповідай на запитання.")
     await state.set_state(Form.name)
 
 @dp.message(Form.name)
@@ -92,22 +91,32 @@ async def get_contact(message: Message, state: FSMContext):
     await state.set_state(Form.photo)
     await message.answer("Надішли фото (одне):")
 
-@dp.message(Form.photo, F.photo)
+@dp.message(Form.photo)
 async def get_photo(message: Message, state: FSMContext):
     data = await state.get_data()
+
+    if not message.photo:
+        await message.answer("❌ Це не фото. Надішли саме зображення через камеру або галерею.")
+        return
+
     caption = f"""
-🖤 Ім’я: {data['name']}
-🎂 Вік: {data['age']}
-📍 Місто: {data['city']}
-🏳️ Орієнтація: {data['orientation']}
-💬 Шукає: {data['looking_for']}
-🎧 Вайб: {data['vibe']}
-📏 Зріст: {data['height']}
-🔗 Telegram: {data['contact']}
+🖤 Ім’я: {data.get('name')}
+🎂 Вік: {data.get('age')}
+📍 Місто: {data.get('city')}
+🏳️ Орієнтація: {data.get('orientation')}
+💬 Шукає: {data.get('looking_for')}
+🎧 Вайб: {data.get('vibe')}
+📏 Зріст: {data.get('height')}
+🔗 Telegram: {data.get('contact')}
 """
-    await bot.send_photo(chat_id=CHANNEL_ID, photo=message.photo[-1].file_id, caption=caption)
-    await message.answer("✅ Твою анкету надіслано до каналу. Дякуємо!")
-    await state.clear()
+    try:
+        await bot.send_photo(chat_id=CHANNEL_ID, photo=message.photo[-1].file_id, caption=caption)
+        await message.answer("✅ Твою анкету надіслано до каналу. Дякуємо!")
+    except Exception as e:
+        logging.exception("❌ Помилка при надсиланні анкети:")
+        await message.answer("⚠️ Сталася помилка при надсиланні анкети. Зв'яжися з адміном.")
+    finally:
+        await state.clear()
 
 # 🔗 Webhook старт
 async def on_startup(app):
@@ -125,6 +134,7 @@ async def handle_webhook(request):
     if request.headers.get("X-Telegram-Bot-Api-Secret-Token") != WEBHOOK_SECRET:
         return web.Response(status=403)
     update = await request.json()
+    logging.info(f"💬 Отримано оновлення: {update}")  # Додано лог
     await dp.feed_raw_update(bot, update)
     return web.Response()
 
