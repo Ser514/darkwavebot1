@@ -1,7 +1,7 @@
 # coding=utf-8
 import os
 import logging
-from aiogram import Bot, Dispatcher, F, types
+from aiogram import Bot, Dispatcher, types, F
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
 from aiogram.fsm.context import FSMContext
@@ -14,7 +14,6 @@ from aiogram.types import (
     InputMediaPhoto, InputMediaVideo
 )
 
-# ENV
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHANNEL_ID = os.getenv("CHANNEL_ID", "@your_channel_id")
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "supersecret")
@@ -22,16 +21,13 @@ BASE_WEBHOOK_URL = os.getenv("BASE_WEBHOOK_URL")
 WEBHOOK_PATH = "/webhook"
 PORT = int(os.getenv("PORT", 10000))
 
-# Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Bot init
 bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
 
-# FSM States
 class Form(StatesGroup):
     name = State()
     age = State()
@@ -43,14 +39,15 @@ class Form(StatesGroup):
     contact = State()
     media = State()
 
-# Store user media temp
 user_media_store = {}
 
-@dp.message(F.command("start"))
+@dp.message(commands=["start"])  # Ось ключова зміна!
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
     await message.answer("🌑 Привіт у Darkwave. Як до тебе звертатися?")
     await state.set_state(Form.name)
+
+# Далі хендлери без змін...
 
 @dp.message(Form.name)
 async def get_name(message: Message, state: FSMContext):
@@ -197,9 +194,12 @@ async def fallback(message: Message, state: FSMContext):
     if current:
         await message.answer("⚠️ Очікую іншу відповідь. Напиши /start щоб почати знову.")
 
-# Webhook
-async def on_startup(app): await bot.set_webhook(f"{BASE_WEBHOOK_URL}{WEBHOOK_PATH}", secret_token=WEBHOOK_SECRET)
-async def on_shutdown(app): await bot.delete_webhook()
+async def on_startup(app):
+    await bot.set_webhook(f"{BASE_WEBHOOK_URL}{WEBHOOK_PATH}", secret_token=WEBHOOK_SECRET)
+
+async def on_shutdown(app):
+    await bot.delete_webhook()
+
 async def handle_webhook(request):
     if request.headers.get("X-Telegram-Bot-Api-Secret-Token") != WEBHOOK_SECRET:
         return web.Response(status=403)
@@ -207,7 +207,6 @@ async def handle_webhook(request):
     await dp.feed_raw_update(bot, update)
     return web.Response()
 
-# AIOHTTP
 app = web.Application()
 app.on_startup.append(on_startup)
 app.on_shutdown.append(on_shutdown)
