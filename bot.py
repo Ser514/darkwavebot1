@@ -11,7 +11,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 # 🔐 ENV-змінні
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-CHANNEL_ID = os.getenv("CHANNEL_ID")  # <-- Виправлено!
+CHANNEL_ID = os.getenv("CHANNEL_ID")
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "supersecret")
 BASE_WEBHOOK_URL = os.getenv("BASE_WEBHOOK_URL")
 WEBHOOK_PATH = "/webhook"
@@ -40,6 +40,7 @@ class Form(StatesGroup):
 
 @dp.message(F.text == "/start")
 async def start_handler(message: Message, state: FSMContext):
+    await state.clear()  # Завжди очищуємо стан при /start
     await message.answer("🌑 Привіт у Darkwave.\nГотовий заповнити анкету? Відповідай на запитання.")
     await state.set_state(Form.name)
 
@@ -134,7 +135,7 @@ async def handle_webhook(request):
     if request.headers.get("X-Telegram-Bot-Api-Secret-Token") != WEBHOOK_SECRET:
         return web.Response(status=403)
     update = await request.json()
-    logging.info(f"💬 Отримано оновлення: {update}")  # Додано лог
+    logging.info(f"💬 Отримано оновлення: {update}")
     await dp.feed_raw_update(bot, update)
     return web.Response()
 
