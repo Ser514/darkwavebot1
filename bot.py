@@ -2,7 +2,7 @@ import os
 import logging
 from aiohttp import web
 from aiogram import Bot, Dispatcher, F
-from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
+from aiogram.types import Message, CallbackQuery, InputMediaPhoto, InputMediaVideo, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
 from aiogram.fsm.state import State, StatesGroup
@@ -36,7 +36,21 @@ class Form(StatesGroup):
     vibe = State()
     height = State()
     contact = State()
-    photo = State()
+    media = State()
+
+user_profiles = {}
+
+def profile_caption(data):
+    return f"""
+🖤 Ім’я: {data.get('name')}
+🎂 Вік: {data.get('age')}
+📍 Місто: {data.get('city')}
+🏳️ Орієнтація: {data.get('orientation')}
+💬 Шукає: {data.get('looking_for')}
+🎧 Вайб: {data.get('vibe')}
+📏 Зріст: {data.get('height')}
+🔗 Telegram: {data.get('contact')}
+"""
 
 @dp.message(F.text == "/start")
 async def start_handler(message: Message, state: FSMContext):
@@ -73,7 +87,7 @@ async def get_orientation(message: Message, state: FSMContext):
     keyboard = ReplyKeyboardMarkup(keyboard=[
         [KeyboardButton(text="Дівчину"), KeyboardButton(text="Хлопця")],
         [KeyboardButton(text="Друга"), KeyboardButton(text="Подругу")],
-        [KeyboardButton(text="FWS"), KeyboardButton(text="ONS")]
+        [KeyboardButton(text="FWB"), KeyboardButton(text="ONS")]
     ], resize_keyboard=True)
     await message.answer("Кого шукаєш?", reply_markup=keyboard)
 
@@ -98,42 +112,44 @@ async def get_height(message: Message, state: FSMContext):
 @dp.message(Form.contact, F.text)
 async def get_contact(message: Message, state: FSMContext):
     await state.update_data(contact=message.text)
-    await state.set_state(Form.photo)
-    await message.answer("Надішли фото (одне):")
+    await state.set_state(Form.media)
+    await message.answer("Надішли до 3 фото або 1 відео і до 2 фото:")
 
-@dp.message(Form.photo)
-async def get_photo(message: Message, state: FSMContext):
+@dp.message(Form.media)
+async def get_media(message: Message, state: FSMContext):
     data = await state.get_data()
+    user_id = message.from_user.id
+    media = user_profiles.get(user_id, {"media": []})["media"]
 
-    if not message.photo:
-        await message.answer("❌ Це не фото. Надішли саме зображення через камеру або галерею.")
+    if message.photo:
+        media.append(InputMediaPhoto(media=message.photo[-1].file_id))
+    elif message.video:
+        media.append(InputMediaVideo(media=message.video.file_id))
+    else:
+        await message.answer("Надішли тільки фото або відео")
         return
 
-    caption = f"""
-🖤 Ім’я: {data.get('name')}
-🎂 Вік: {data.get('age')}
-📍 Місто: {data.get('city')}
-🏳️ Орієнтація: {data.get('orientation')}
-💬 Шукає: {data.get('looking_for')}
-🎧 Вайб: {data.get('vibe')}
-📏 Зріст: {data.get('height')}
-🔗 Telegram: {data.get('contact')}
-"""
-    try:
-        await bot.send_photo(chat_id=CHANNEL_ID, photo=message.photo[-1].file_id, caption=caption)
-        await message.answer("✅ Твою анкету надіслано до каналу. Дякуємо!")
-    except Exception as e:
-        logging.exception("❌ Помилка при надсиланні анкети:")
-        await message.answer("⚠️ Сталася помилка при надсиланні анкети. Зв'яжися з адміном.")
-    finally:
+    if len(media) >= 3:
+        caption = profile_caption(data)
+        try:
+            media[0].caption = caption
+            await bot.send_media_group(chat_id=CHANNEL_ID, media=media)
+            await message.answer("✅ Твою анкету надіслано до каналу. Дякуємо!")
+        except Exception as e:
+            logging.exception("❌ Помилка при надсиланні анкети:")
+            await message.answer("⚠️ Сталася помилка при надсиланні анкети. Зв'яжися з адміном.")
         await state.clear()
+        user_profiles.pop(user_id, None)
+    else:
+        user_profiles[user_id] = {"media": media}
+        await message.answer(f"Можна ще {3 - len(media)} файл(и).")
 
 # 🔁 Відповідь на неочікувані повідомлення в будь-якому стані
 @dp.message()
 async def fallback(message: Message, state: FSMContext):
     current_state = await state.get_state()
     if current_state:
-        await message.answer("⚠️ Очікую іншу відповідь. Наприклад, текст або фото залежно від питання. Якщо хочеш перезапустити анкету — напиши /start")
+        await message.answer("⚠️ Очікую іншу відповідь. Якщо хочеш перезапустити анкету — напиши /start")
 
 # 🔗 Webhook старт
 async def on_startup(app):
