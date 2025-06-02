@@ -40,53 +40,53 @@ class Form(StatesGroup):
 
 @dp.message(F.text == "/start")
 async def start_handler(message: Message, state: FSMContext):
-    await state.clear()  # Завжди очищуємо стан при /start
-    await message.answer("🌑 Привіт у Darkwave.\nЯк до тебе звертатися?")
+    await state.clear()
+    await message.answer("🌑 Привіт у Darkwave.\nГотовий заповнити анкету? Відповідай на запитання.")
     await state.set_state(Form.name)
 
-@dp.message(Form.name)
+@dp.message(Form.name, F.text)
 async def get_name(message: Message, state: FSMContext):
     await state.update_data(name=message.text)
     await state.set_state(Form.age)
     await message.answer("Скільки тобі років?")
 
-@dp.message(Form.age)
+@dp.message(Form.age, F.text)
 async def get_age(message: Message, state: FSMContext):
     await state.update_data(age=message.text)
     await state.set_state(Form.city)
     await message.answer("Звідки ти?")
 
-@dp.message(Form.city)
+@dp.message(Form.city, F.text)
 async def get_city(message: Message, state: FSMContext):
     await state.update_data(city=message.text)
     await state.set_state(Form.orientation)
     await message.answer("Яка твоя орієнтація? (Гетеро / Бі / Інше)")
 
-@dp.message(Form.orientation)
+@dp.message(Form.orientation, F.text)
 async def get_orientation(message: Message, state: FSMContext):
     await state.update_data(orientation=message.text)
     await state.set_state(Form.looking_for)
     await message.answer("Кого шукаєш?")
 
-@dp.message(Form.looking_for)
+@dp.message(Form.looking_for, F.text)
 async def get_looking_for(message: Message, state: FSMContext):
     await state.update_data(looking_for=message.text)
     await state.set_state(Form.vibe)
     await message.answer("Опиши свій вайб, стиль або музику яку слухаєш:")
 
-@dp.message(Form.vibe)
+@dp.message(Form.vibe, F.text)
 async def get_vibe(message: Message, state: FSMContext):
     await state.update_data(vibe=message.text)
     await state.set_state(Form.height)
     await message.answer("Який твій зріст?")
 
-@dp.message(Form.height)
+@dp.message(Form.height, F.text)
 async def get_height(message: Message, state: FSMContext):
     await state.update_data(height=message.text)
     await state.set_state(Form.contact)
     await message.answer("Вкажи свій Telegram @нік:")
 
-@dp.message(Form.contact)
+@dp.message(Form.contact, F.text)
 async def get_contact(message: Message, state: FSMContext):
     await state.update_data(contact=message.text)
     await state.set_state(Form.photo)
@@ -118,6 +118,13 @@ async def get_photo(message: Message, state: FSMContext):
         await message.answer("⚠️ Сталася помилка при надсиланні анкети. Зв'яжися з адміном.")
     finally:
         await state.clear()
+
+# 🔁 Відповідь на неочікувані повідомлення в будь-якому стані
+@dp.message()
+async def fallback(message: Message, state: FSMContext):
+    current_state = await state.get_state()
+    if current_state:
+        await message.answer("⚠️ Очікую іншу відповідь. Наприклад, текст або фото залежно від питання. Якщо хочеш перезапустити анкету — напиши /start")
 
 # 🔗 Webhook старт
 async def on_startup(app):
