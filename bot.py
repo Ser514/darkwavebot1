@@ -26,7 +26,7 @@ class Form(StatesGroup):
 @dp.message_handler(commands='start')
 async def start_handler(message: types.Message):
     await message.answer("🌑 Привіт у Darkwave.")
-Готовий заповнити анкету? Відповідай на запитання.")
+('Готовий заповнити анкету? Відповідай на запитання.")
     await Form.name.set()
 
 @dp.message_handler(state=Form.name)
@@ -63,7 +63,7 @@ async def get_looking_for(message: types.Message, state: FSMContext):
 async def get_vibe(message: types.Message, state: FSMContext):
     await state.update_data(vibe=message.text)
     await Form.next()
-    await message.answer("Який твій зріст? (можна пропустити)")
+    await message.answer("Який твій зріст?")
 
 @dp.message_handler(state=Form.height)
 async def get_height(message: types.Message, state: FSMContext):
