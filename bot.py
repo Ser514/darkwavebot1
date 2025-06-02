@@ -41,7 +41,7 @@ class Form(StatesGroup):
 @dp.message(F.text == "/start")
 async def start_handler(message: Message, state: FSMContext):
     await state.clear()  # Завжди очищуємо стан при /start
-    await message.answer("🌑 Привіт у Darkwave.\nГотовий заповнити анкету? Відповідай на запитання.")
+    await message.answer("🌑 Привіт у Darkwave.\nЯк до тебе звертатися?")
     await state.set_state(Form.name)
 
 @dp.message(Form.name)
