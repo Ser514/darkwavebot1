@@ -1,29 +1,34 @@
 import os
 import asyncio
+import logging
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.types import Message
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
+from aiogram.exceptions import TelegramConflictError
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 
-# Ініціалізація бота
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-CHANNEL_ID = os.getenv("CHANNEL_ID")  # приклад: '@darkwave_channel'
+# Ініціалізація логів
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
+# .env змінні
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+CHANNEL_ID = os.getenv("CHANNEL_ID")  # приклад: '@darkwave_love'
+
+# Ініціалізація бота
 bot = Bot(
     token=BOT_TOKEN,
     default=DefaultBotProperties(parse_mode=ParseMode.HTML)
 )
-
-# Налаштування диспетчера та FSM
 storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
 router = Router()
 dp.include_router(router)
 
-# Стани анкети
+# Стан анкети
 class Form(StatesGroup):
     name = State()
     age = State()
@@ -104,9 +109,23 @@ async def get_photo(message: Message, state: FSMContext):
     await message.answer("✅ Твою анкету надіслано до каналу. Дякуємо!")
     await state.clear()
 
-# Запуск бота
+# Головна функція запуску
 async def main():
-    await dp.start_polling(bot)
+    try:
+        logger.info("Видаляю активний webhook (якщо є)...")
+        await bot.delete_webhook(drop_pending_updates=True)
+
+        logger.info("Запускаю бота через polling...")
+        await dp.start_polling(bot)
+
+    except TelegramConflictError as e:
+        logger.error(f"⚠️ TelegramConflictError: {e}")
+        logger.error("🔴 Можливо, бот уже запущений в іншому місці. Перевір і зупини зайвий процес.")
+        raise SystemExit("Завершено через конфлікт getUpdates")
+
+    except Exception as e:
+        logger.exception("❌ Неочікувана помилка під час запуску бота")
+        raise e
 
 if __name__ == "__main__":
     asyncio.run(main())
