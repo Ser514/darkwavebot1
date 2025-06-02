@@ -3,11 +3,12 @@ import os
 import logging
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.types import (
-    Message, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton,
+    Message, ReplyKeyboardMarkup, KeyboardButton,
+    InlineKeyboardMarkup, InlineKeyboardButton,
     InputMediaPhoto, InputMediaVideo
 )
 from aiogram.enums import ParseMode
-from aiogram.filters import Command
+from aiogram.client.session.bot import DefaultBotProperties
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage
@@ -23,7 +24,10 @@ PORT = int(os.getenv("PORT", 10000))
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-bot = Bot(token=BOT_TOKEN, parse_mode=ParseMode.HTML)
+bot = Bot(
+    token=BOT_TOKEN,
+    default=DefaultBotProperties(parse_mode=ParseMode.HTML)
+)
 storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
 
@@ -41,7 +45,7 @@ class Form(StatesGroup):
 MAX_PHOTOS = 3
 user_media_store = {}
 
-@dp.message(Command(commands=["start"]))
+@dp.message(F.text == "/start")
 async def start_handler(message: Message, state: FSMContext):
     await state.clear()
     await message.answer("🌑 Привіт у Darkwave. Як до тебе звертатися?")
@@ -120,26 +124,18 @@ async def collect_media(message: Message, state: FSMContext):
 
     media_list = user_media_store[user_id]
 
-    # Перевірка ліміту для відео
     if message.video:
         if any(isinstance(m, InputMediaVideo) for m in media_list):
             await message.answer("🎥 Вже є відео. Можна лише одне.")
             return
-        if len(media_list) > 2:
-            await message.answer("⚠️ Якщо додаєш відео, максимум 1 відео + 2 фото.")
-            return
         media_list.append(InputMediaVideo(media=message.video.file_id))
     elif message.photo:
         photo_count = sum(isinstance(m, InputMediaPhoto) for m in media_list)
-        video_count = sum(isinstance(m, InputMediaVideo) for m in media_list)
-        if video_count and photo_count >= 2:
-            await message.answer("📸 Максимум 1 відео + 2 фото.")
-            return
-        if not video_count and photo_count >= MAX_PHOTOS:
+        if photo_count >= MAX_PHOTOS:
             await message.answer("📸 Максимум 3 фото.")
             return
         media_list.append(InputMediaPhoto(media=message.photo[-1].file_id))
-    await message.answer("✅ Додано. Надсилай ще, або напиши /done щоб завершити.")
+    await message.answer("✅ Додано. Ще щось? /done коли все.")
 
 @dp.message(Form.photo, F.text == "/done")
 async def finish_media_collection(message: Message, state: FSMContext):
@@ -164,6 +160,7 @@ async def finish_media_collection(message: Message, state: FSMContext):
 
     try:
         media[0].caption = caption
+        media[0].parse_mode = ParseMode.HTML
         await bot.send_media_group(chat_id=CHANNEL_ID, media=media)
         await message.answer("✅ Анкету опубліковано.")
         await show_profiles(message)
@@ -187,7 +184,7 @@ def profile_interaction_keyboard(user_id: int) -> InlineKeyboardMarkup:
     ])
 
 async def show_profiles(message: Message):
-    # Тут має бути логіка показу профілів з бази, зараз - фейкові
+    # Тимчасові фейкові анкети — заміни на справжні із бази!
     fake_profiles = [
         {"id": 1001, "name": "Аліса", "age": 23, "city": "Київ", "photo": "AgACAgQAAxkBA..."},
         {"id": 1002, "name": "Макс", "age": 26, "city": "Львів", "photo": "AgACAgQAAxkBA..."}
@@ -201,7 +198,7 @@ async def show_profiles(message: Message):
             reply_markup=profile_interaction_keyboard(profile["id"])
         )
 
-@dp.message(Command(commands=["me"]))
+@dp.message(F.text == "/me")
 async def my_profile(message: Message, state: FSMContext):
     data = await state.get_data()
     if not data:
@@ -220,8 +217,6 @@ async def fallback(message: Message, state: FSMContext):
     current_state = await state.get_state()
     if current_state:
         await message.answer("⚠️ Очікую іншу відповідь. Напиши /start щоб почати заново.")
-    else:
-        await message.answer("❓ Я не розумію. Напиши /start для початку.")
 
 async def on_startup(app):
     webhook_url = f"{BASE_WEBHOOK_URL}{WEBHOOK_PATH}"
