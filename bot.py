@@ -2,7 +2,7 @@ import os
 import logging
 from aiohttp import web
 from aiogram import Bot, Dispatcher, F
-from aiogram.types import Message
+from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
 from aiogram.fsm.state import State, StatesGroup
@@ -60,19 +60,28 @@ async def get_age(message: Message, state: FSMContext):
 async def get_city(message: Message, state: FSMContext):
     await state.update_data(city=message.text)
     await state.set_state(Form.orientation)
-    await message.answer("Яка твоя орієнтація? (Гетеро / Бі / Інше)")
+    keyboard = ReplyKeyboardMarkup(keyboard=[
+        [KeyboardButton(text="Гетеро"), KeyboardButton(text="Бі")],
+        [KeyboardButton(text="Інше")]
+    ], resize_keyboard=True)
+    await message.answer("Яка твоя орієнтація?", reply_markup=keyboard)
 
 @dp.message(Form.orientation, F.text)
 async def get_orientation(message: Message, state: FSMContext):
     await state.update_data(orientation=message.text)
     await state.set_state(Form.looking_for)
-    await message.answer("Кого шукаєш?")
+    keyboard = ReplyKeyboardMarkup(keyboard=[
+        [KeyboardButton(text="Дівчину"), KeyboardButton(text="Хлопця")],
+        [KeyboardButton(text="Друга"), KeyboardButton(text="Подругу")],
+        [KeyboardButton(text="FWS"), KeyboardButton(text="ONS")]
+    ], resize_keyboard=True)
+    await message.answer("Кого шукаєш?", reply_markup=keyboard)
 
 @dp.message(Form.looking_for, F.text)
 async def get_looking_for(message: Message, state: FSMContext):
     await state.update_data(looking_for=message.text)
     await state.set_state(Form.vibe)
-    await message.answer("Опиши свій вайб, стиль або музику яку слухаєш:")
+    await message.answer("Опиши свій вайб, стиль або музику яку слухаєш:", reply_markup=ReplyKeyboardMarkup(keyboard=[], resize_keyboard=True))
 
 @dp.message(Form.vibe, F.text)
 async def get_vibe(message: Message, state: FSMContext):
