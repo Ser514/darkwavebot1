@@ -16,7 +16,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # .env змінні
-BOT_TOKEN = os.getenv("BOT_TOKEN") or "7735699455:AAHG1QV9B-h6IwCCvHYmw0nlqUy0PcwBZSw"
+BOT_TOKEN = os.getenv("BOT_TOKEN") or "7735699455:AAGJesHAXrWqsoadTqVTr6x9JtkkoGS9n0M"
 CHANNEL_ID = os.getenv("CHANNEL_ID") or "@darkwave_love"
 
 # Ініціалізація бота
