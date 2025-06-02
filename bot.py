@@ -1,32 +1,29 @@
+# coding=utf-8
 import os
 import logging
-from aiohttp import web
-from aiogram import Bot, Dispatcher, F
-from aiogram.types import Message, CallbackQuery, InputMediaPhoto, InputMediaVideo, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram import Bot, Dispatcher, F, types
+from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto, InputMediaVideo
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage
+from aiohttp import web
 
-# 🔐 ENV-змінні
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-CHANNEL_ID = os.getenv("CHANNEL_ID")
+CHANNEL_ID = os.getenv("CHANNEL_ID", "@your_channel_id")
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "supersecret")
 BASE_WEBHOOK_URL = os.getenv("BASE_WEBHOOK_URL")
 WEBHOOK_PATH = "/webhook"
 PORT = int(os.getenv("PORT", 10000))
 
-# ⚙️ Логування
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-# 🤖 Ініціалізація бота
 bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
 
-# 📋 Стан машини
 class Form(StatesGroup):
     name = State()
     age = State()
@@ -36,26 +33,15 @@ class Form(StatesGroup):
     vibe = State()
     height = State()
     contact = State()
-    media = State()
+    photo = State()
 
-user_profiles = {}
+MAX_PHOTOS = 3
+user_media_store = {}
 
-def profile_caption(data):
-    return f"""
-🖤 Ім’я: {data.get('name')}
-🎂 Вік: {data.get('age')}
-📍 Місто: {data.get('city')}
-🏳️ Орієнтація: {data.get('orientation')}
-💬 Шукає: {data.get('looking_for')}
-🎧 Вайб: {data.get('vibe')}
-📏 Зріст: {data.get('height')}
-🔗 Telegram: {data.get('contact')}
-"""
-
-@dp.message(F.text == "/start")
+@dp.message(F.command("start"))
 async def start_handler(message: Message, state: FSMContext):
     await state.clear()
-    await message.answer("🌑 Привіт у Darkwave.\nяк до тебе звертатися?")
+    await message.answer("🌑 Привіт у Darkwave. Як до тебе звертатися?")
     await state.set_state(Form.name)
 
 @dp.message(Form.name, F.text)
@@ -73,29 +59,29 @@ async def get_age(message: Message, state: FSMContext):
 @dp.message(Form.city, F.text)
 async def get_city(message: Message, state: FSMContext):
     await state.update_data(city=message.text)
-    await state.set_state(Form.orientation)
     keyboard = ReplyKeyboardMarkup(keyboard=[
         [KeyboardButton(text="Гетеро"), KeyboardButton(text="Бі")],
         [KeyboardButton(text="Інше")]
     ], resize_keyboard=True)
+    await state.set_state(Form.orientation)
     await message.answer("Яка твоя орієнтація?", reply_markup=keyboard)
 
 @dp.message(Form.orientation, F.text)
 async def get_orientation(message: Message, state: FSMContext):
     await state.update_data(orientation=message.text)
-    await state.set_state(Form.looking_for)
     keyboard = ReplyKeyboardMarkup(keyboard=[
         [KeyboardButton(text="Дівчину"), KeyboardButton(text="Хлопця")],
         [KeyboardButton(text="Друга"), KeyboardButton(text="Подругу")],
         [KeyboardButton(text="FWB"), KeyboardButton(text="ONS")]
     ], resize_keyboard=True)
+    await state.set_state(Form.looking_for)
     await message.answer("Кого шукаєш?", reply_markup=keyboard)
 
 @dp.message(Form.looking_for, F.text)
 async def get_looking_for(message: Message, state: FSMContext):
     await state.update_data(looking_for=message.text)
     await state.set_state(Form.vibe)
-    await message.answer("Опиши свій вайб, стиль або музику яку слухаєш:", reply_markup=ReplyKeyboardMarkup(keyboard=[], resize_keyboard=True))
+    await message.answer("Опиши свій вайб або музику яку слухаєш:")
 
 @dp.message(Form.vibe, F.text)
 async def get_vibe(message: Message, state: FSMContext):
@@ -112,66 +98,117 @@ async def get_height(message: Message, state: FSMContext):
 @dp.message(Form.contact, F.text)
 async def get_contact(message: Message, state: FSMContext):
     await state.update_data(contact=message.text)
-    await state.set_state(Form.media)
-    await message.answer("Надішли до 3 фото або 1 відео і до 2 фото:")
+    await state.set_state(Form.photo)
+    await message.answer("Надішли до 3 фото або 1 відео + 2 фото. Напиши /done коли завершиш.")
 
-@dp.message(Form.media)
-async def get_media(message: Message, state: FSMContext):
-    data = await state.get_data()
+@dp.message(Form.photo, F.photo | F.video)
+async def collect_media(message: Message, state: FSMContext):
     user_id = message.from_user.id
-    media = user_profiles.get(user_id, {"media": []})["media"]
+    if user_id not in user_media_store:
+        user_media_store[user_id] = []
 
-    if message.photo:
-        media.append(InputMediaPhoto(media=message.photo[-1].file_id))
-    elif message.video:
-        media.append(InputMediaVideo(media=message.video.file_id))
-    else:
-        await message.answer("Надішли тільки фото або відео")
+    media_list = user_media_store[user_id]
+
+    if message.video:
+        if any(isinstance(m, InputMediaVideo) for m in media_list):
+            await message.answer("🎥 Вже є відео. Можна лише одне.")
+            return
+        media_list.append(InputMediaVideo(media=message.video.file_id))
+    elif message.photo:
+        if sum(isinstance(m, InputMediaPhoto) for m in media_list) >= MAX_PHOTOS:
+            await message.answer("📸 Максимум 3 фото.")
+            return
+        media_list.append(InputMediaPhoto(media=message.photo[-1].file_id))
+    await message.answer("✅ Додано. Ще щось? /done коли все.")
+
+@dp.message(Form.photo, F.text == "/done")
+async def finish_media_collection(message: Message, state: FSMContext):
+    user_id = message.from_user.id
+    data = await state.get_data()
+    media = user_media_store.get(user_id, [])
+
+    if not media:
+        await message.answer("⚠️ Ти не надіслав жодного медіа.")
         return
 
-    if len(media) >= 3:
-        caption = profile_caption(data)
-        try:
-            media[0].caption = caption
-            await bot.send_media_group(chat_id=CHANNEL_ID, media=media)
-            await message.answer("✅ Твою анкету надіслано до каналу. Дякуємо!")
-        except Exception as e:
-            logging.exception("❌ Помилка при надсиланні анкети:")
-            await message.answer("⚠️ Сталася помилка при надсиланні анкети. Зв'яжися з адміном.")
-        await state.clear()
-        user_profiles.pop(user_id, None)
-    else:
-        user_profiles[user_id] = {"media": media}
-        await message.answer(f"Можна ще {3 - len(media)} файл(и).")
+    caption = (
+        f"🖤 Ім’я: {data.get('name')}\n"
+        f"🎂 Вік: {data.get('age')}\n"
+        f"📍 Місто: {data.get('city')}\n"
+        f"🏳️ Орієнтація: {data.get('orientation')}\n"
+        f"💬 Шукає: {data.get('looking_for')}\n"
+        f"🎧 Вайб: {data.get('vibe')}\n"
+        f"📏 Зріст: {data.get('height')}\n"
+        f"🔗 Telegram: {data.get('contact')}"
+    )
 
-# 🔁 Відповідь на неочікувані повідомлення в будь-якому стані
+    try:
+        media[0].caption = caption
+        media[0].parse_mode = ParseMode.HTML
+        await bot.send_media_group(chat_id=CHANNEL_ID, media=media)
+        await message.answer("✅ Анкету опубліковано.")
+        await show_profiles(message)
+    except Exception as e:
+        logging.exception("❌ Помилка надсилання:")
+        await message.answer("⚠️ Помилка публікації.")
+    finally:
+        user_media_store.pop(user_id, None)
+        await state.clear()
+
+def profile_interaction_keyboard(user_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="❤️ Лайк", callback_data=f"like_{user_id}"),
+         InlineKeyboardButton(text="👎 Дизлайк", callback_data=f"dislike_{user_id}")],
+        [InlineKeyboardButton(text="✉️ Написати", callback_data=f"msg_{user_id}"),
+         InlineKeyboardButton(text="📹 Кружок", callback_data=f"circle_{user_id}")]
+    ])
+
+async def show_profiles(message: Message):
+    fake_profiles = [
+        {"id": 1001, "name": "Аліса", "age": 23, "city": "Київ", "photo": "AgACAgQAAxkBA..."},
+        {"id": 1002, "name": "Макс", "age": 26, "city": "Львів", "photo": "AgACAgQAAxkBA..."}
+    ]
+    for profile in fake_profiles:
+        caption = f"🖤 {profile['name']}, {profile['age']} років\n📍 {profile['city']}"
+        await bot.send_photo(chat_id=message.chat.id, photo=profile["photo"],
+                             caption=caption, reply_markup=profile_interaction_keyboard(profile["id"]))
+
+@dp.message(F.text == "/me")
+async def my_profile(message: Message, state: FSMContext):
+    data = await state.storage.get_data(chat=message.chat.id, user=message.from_user.id)
+    if not data:
+        await message.answer("📭 У тебе ще нема анкети. Напиши /start")
+        return
+    text = (
+        f"🖤 Ім’я: {data.get('name')}\n"
+        f"🎂 Вік: {data.get('age')}\n"
+        f"📍 Місто: {data.get('city')}\n"
+        f"Щоб змінити — напиши /start"
+    )
+    await message.answer(text)
+
 @dp.message()
 async def fallback(message: Message, state: FSMContext):
     current_state = await state.get_state()
     if current_state:
-        await message.answer("⚠️ Очікую іншу відповідь. Якщо хочеш перезапустити анкету — напиши /start")
+        await message.answer("⚠️ Очікую іншу відповідь. Напиши /start щоб почати заново.")
 
-# 🔗 Webhook старт
 async def on_startup(app):
     webhook_url = f"{BASE_WEBHOOK_URL}{WEBHOOK_PATH}"
     await bot.set_webhook(webhook_url, secret_token=WEBHOOK_SECRET)
     logger.info(f"Webhook встановлено: {webhook_url}")
 
-# 🧹 Webhook стоп
 async def on_shutdown(app):
     await bot.delete_webhook()
     logger.info("Webhook видалено")
 
-# 🔁 Обробка запитів Telegram
 async def handle_webhook(request):
     if request.headers.get("X-Telegram-Bot-Api-Secret-Token") != WEBHOOK_SECRET:
         return web.Response(status=403)
     update = await request.json()
-    logging.info(f"💬 Отримано оновлення: {update}")
     await dp.feed_raw_update(bot, update)
     return web.Response()
 
-# 🧩 Запуск aiohttp сервера
 app = web.Application()
 app.on_startup.append(on_startup)
 app.on_shutdown.append(on_shutdown)
