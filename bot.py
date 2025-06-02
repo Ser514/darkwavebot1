@@ -11,7 +11,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 # 🔐 ENV-змінні
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-CHANNEL_ID = os.getenv("BOT_TOKEN")  # Наприклад: @darkwave_love
+CHANNEL_ID = os.getenv("CHANNEL_ID")  # Наприклад: @darkwave_love
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "supersecret")
 BASE_WEBHOOK_URL = os.getenv("BASE_WEBHOOK_URL")  # https://your-app.onrender.com
 WEBHOOK_PATH = "/webhook"
