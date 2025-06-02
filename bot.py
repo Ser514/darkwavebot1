@@ -9,27 +9,24 @@ from aiogram.exceptions import TelegramConflictError
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
+import sys
 
-# 🔧 Конфіг
-BOT_TOKEN = "7735699455:AAGJesHAXrWqsoadTqVTr6x9JtkkoGS9n0M"
-CHANNEL_ID = "@darkwave_love"
-
-# ✅ Валідація
-if not BOT_TOKEN or not CHANNEL_ID:
-    raise ValueError("❌ BOT_TOKEN або CHANNEL_ID не задані")
-
-# 🔔 Логування
+# Ініціалізація логів
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# 🚀 Ініціалізація
+# .env змінні
+BOT_TOKEN = os.getenv("BOT_TOKEN") or "7735699455:AAHG1QV9B-h6IwCCvHYmw0nlqUy0PcwBZSw"
+CHANNEL_ID = os.getenv("CHANNEL_ID") or "@darkwave_love"
+
+# Ініціалізація бота
 bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
 router = Router()
 dp.include_router(router)
 
-# 📋 Стан анкети
+# Стани анкети
 class Form(StatesGroup):
     name = State()
     age = State()
@@ -41,7 +38,7 @@ class Form(StatesGroup):
     contact = State()
     photo = State()
 
-# 📍 Команда /start
+# /start
 @router.message(F.text == "/start")
 async def start_handler(message: Message, state: FSMContext):
     await message.answer("🌑 Привіт у Darkwave.\nГотовий заповнити анкету? Відповідай на запитання.")
@@ -110,26 +107,24 @@ async def get_photo(message: Message, state: FSMContext):
     await message.answer("✅ Твою анкету надіслано до каналу. Дякуємо!")
     await state.clear()
 
-@router.message(Form.photo)
-async def warn_photo(message: Message):
-    await message.answer("📸 Надішли саме фото, будь ласка.")
-
-# ▶️ Запуск
+# Головна функція запуску
 async def main():
     try:
-        logger.info("⏳ Видаляю активний webhook (якщо є)...")
+        logger.info("Видаляю webhook і очищую pending updates...")
         await bot.delete_webhook(drop_pending_updates=True)
 
-        logger.info("🚀 Запускаю polling...")
+        logger.info("Запускаю бота через polling...")
         await dp.start_polling(bot)
 
     except TelegramConflictError as e:
-        logger.error(f"⚠️ TelegramConflictError: {e}")
-        raise SystemExit("🔴 Бот уже працює десь іще. Завершую...")
+        logger.error(f"❌ Конфлікт: {e}")
+        logger.error("🔴 Схоже, бот уже працює десь ще. Зупини інші процеси або перезапусти токен через BotFather.")
+        sys.exit("Вихід через TelegramConflictError")
 
     except Exception as e:
-        logger.exception("❌ Помилка при запуску")
+        logger.exception("❌ Неочікувана помилка під час запуску бота")
         raise e
 
 if __name__ == "__main__":
     asyncio.run(main())
+
