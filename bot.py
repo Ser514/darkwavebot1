@@ -10,10 +10,10 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage
 
 # 🔐 ENV-змінні
-BOT_TOKEN = os.getenv("7735699455:AAGJesHAXrWqsoadTqVTr6x9JtkkoGS9n0M")
-CHANNEL_ID = os.getenv("@darkwave_love")  # Наприклад: @darkwave_love
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+CHANNEL_ID = os.getenv("BOT_TOKEN")  # Наприклад: @darkwave_love
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "supersecret")
-BASE_WEBHOOK_URL = os.getenv("https://darkwavebot1-1.onrender.com")  # https://your-app.onrender.com
+BASE_WEBHOOK_URL = os.getenv("BASE_WEBHOOK_URL")  # https://your-app.onrender.com
 WEBHOOK_PATH = "/webhook"
 PORT = int(os.getenv("PORT", 10000))
 
